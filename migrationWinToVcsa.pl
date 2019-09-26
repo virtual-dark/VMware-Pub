@@ -30,10 +30,10 @@ lib->import( $standaloneLib );
 use JSON;
 use Encode;
 
-my $whatMagicIsDoneHere = 'This script is an example script to automate win to vcsa migration actions'; ## printed by --help
+my $whatMagicIsDoneHere = "This script is an example script to automate win to vcsa migration actions \nExample : perl /home/github/VMware-Pub/migrationWinToVcsa.pl --contextFile /home/github/no_depot/VMUG/LABs/migrateWinToVcsa/env_migration_win_to_vcsa --actions getVcenterBuildForProvider --dryRun 1"; ## printed by --help
 
 my @checkAndPrepare     = (qw/getVcenterBuildForVcMigration createSnapshot certsValidity unregisterExtensionVUM deleteComputerOnAD checkServices/);
-my @runtime             = (qw/generateJson startAssistantMigration checkVcsaBin launchVerifyMigration launchMigration/);
+my @runtime             = (qw/generateJson startAssistantMigration checkVcsaBin launchVerifyMigration launchMigration getVcenterBuildForVcMigration/);
 my @migrateFullActions  = (@checkAndPrepare,@runtime);
 my @actionsIsolated     = (qw/monitoAssistantMigration mountIsoFile monitoVerifyMigration monitoMigration getVcenterBuildForProvider /);
 my $helpAction          = ' List Actions :
@@ -157,7 +157,21 @@ sub getVcenterBuildForProvider
 
 sub getVcenterBuildForVcMigration
 {
-    return getVcenterAbout( 'connectTo' => 'vcMigration' );
+    my $try = 10;
+    while ($try > 0)
+    {
+        my $fnret =  getVcenterAbout( 'connectTo' => 'vcMigration' );
+        if(not $fnret)
+        {
+            Logger::warn('Failed to execute method "getVcenterAbout"',$fnret);
+            waiting( timeout => 30 );
+            $try -= 1;
+            next;
+        }
+        return $fnret;
+    }
+    Logger::warn('Timeout!!!' );
+    return Result->TIMEOUT();
 }
 
 sub getVcenterAbout
@@ -305,7 +319,7 @@ sub monitoProcess
     my $logDir  =  $params{'logDir'} || return Result->MISSING_PARAMETER('Missing logDir');
     
     my $installStatus = '';
-    my $try = 720;
+    my $try = 1080;
     while ($try > 0)
     {
         my $fnret = decodeJsonFile(
@@ -1102,7 +1116,7 @@ sub connectTovCenter
     };
     if($@)
     {
-        Logger::critical('Faile to set option',$@);
+        Logger::critical('Failed to set option',$@);
         return Result->INTERNAL_ERROR();
     }
 
@@ -1112,7 +1126,7 @@ sub connectTovCenter
     };
     if($@)
     {
-        Logger::critical('Fail to connect',$@);
+        Logger::critical('Failed to connect',$@);
         return Result->INTERNAL_ERROR();
     }
     Logger::log('Connected');
